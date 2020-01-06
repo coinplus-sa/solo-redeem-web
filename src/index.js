@@ -1,5 +1,10 @@
 import 'bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
+//import "./style.css";
+var _ = require('file-loader?name=[name].[ext]!./index.html');
+import img from "./coinplus-icon.png";
+import imglogo from "./coinplus-logo.png";
+//const $ = require('jquery');
 import $ from "jquery";
 import {raise_if_bad_address, verify_solo_check, recompute_private_key, compute_address, compute_wif_privkey} from "./utils";
 import {reconstruct_secrets} from "./shamir";

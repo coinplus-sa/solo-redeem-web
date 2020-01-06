@@ -48,17 +48,6 @@ module.exports = {
           test: /\.jpe?g$|\.ico$|\.gif$|\.png$|\.svg$|\.woff$|\.ttf$|\.wav$|\.mp3$/,
           loader: 'file-loader?name=[name].[ext]'  // <-- retain original file name
       }
-      /*,
-      {
-        test: /\.(png|jp(e*)g|svg)$/,  
-        use: [{
-            loader: 'url-loader',
-            options: { 
-                limit: 6000, // Convert images < 8kb to base64 strings
-                name: 'img/[hash]-[name].[ext]'
-            } 
-        }]
-      }*/
 
     ]
    },

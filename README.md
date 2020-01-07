@@ -22,3 +22,7 @@ open the following file in a browser:
     dist/index.html
 
 
+## Test the site online 
+
+https://coinplus-sa.github.io/solo-redeem-web/
+

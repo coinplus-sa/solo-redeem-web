@@ -134,80 +134,88 @@ function get_secrets_solo_pro(){
 async function recompute() {
   cleanprivate();
   var secrets;
-    if ($("#type_solo").val() === "SOLO"){
-    secrets = get_secrets_solo();
-    }
-    if ($("#type_solo").val() === "PRO"){
-        secrets = get_secrets_solo_pro();
-    }
+  if ($("#type_solo").val() === "SOLO"){
+  secrets = get_secrets_solo();
+  }
+  if ($("#type_solo").val() === "PRO"){
+      secrets = get_secrets_solo_pro();
+  }
 
-    var enc = new TextEncoder();
-    var secret1_b58_buff = enc.encode(secrets.secret1_b58);
-    var secret2_b58_buff = enc.encode(secrets.secret2_b58);
+  var enc = new TextEncoder();
+  var secret1_b58_buff = enc.encode(secrets.secret1_b58);
+  var secret2_b58_buff = enc.encode(secrets.secret2_b58);
 
-    var value = 0;
+  var value = 0;
 
-    raise_if_bad_address($("#address_solo").val(), $("#crypto_solo").val(), function(){
-        myalert("#errorrecompute", "<strong>Error.</strong> This is not a valid Address");
-    })
-    var pair = await recompute_private_key(secret1_b58_buff, secret2_b58_buff,
-                       function(progress){
-                        $('#recomputeprogress').css('width', progress + '%').attr('aria-valuenow', progress);
-                       },
-                       function(error){
-                        myalert("#errorrecompute", "<strong>Error.</strong>" + error);
-                        throw("recompute error");
-                       });
-    pair.getPublic(); // force to compute the public key
-    var newaddr = compute_address(pair.pub,  $("#crypto_solo").val());
-    var entered_address = $("#address_solo").val();
+  raise_if_bad_address($("#address_solo").val(), $("#crypto_solo").val(), function(){
+      myalert("#errorrecompute", "<strong>Error.</strong> This is not a valid Address");
+  })
+  var pair = await recompute_private_key(secret1_b58_buff, secret2_b58_buff,
+                                         function(progress){
+                                          $('#recomputeprogress').css('width', progress + '%').attr('aria-valuenow', progress);
+                                         },
+                                         function(error){
+                                          myalert("#errorrecompute", "<strong>Error.</strong>" + error);
+                                          throw("recompute error");
+                                         });
+  pair.getPublic(); // force to compute the public key
+  var newaddr = compute_address(pair.pub,  $("#crypto_solo").val());
+  var entered_address = $("#address_solo").val();
 
-    if($("#crypto_solo").val() == "ETH")
-    {
+  if($("#crypto_solo").val() == "ETH")
+  {
     entered_address = entered_address.toLowerCase();
   }
-    if (newaddr !== entered_address){
-        myalert("#errorrecompute", "<strong>Error.</strong> The recomputed address is different than the address you entered. Please verify your address and secrets");
-        throw("wrong address");
+  if($("#crypto_solo").val() == "BCH")
+  {
+    if (!entered_address.startsWith("bitcoincash:"))
+    {
+      entered_address = "bitcoincash:" + entered_address;
+      $("#address_solo").val(entered_address)
+    }
+  }
+  if (newaddr !== entered_address){
+    myalert("#errorrecompute", "<strong>Error.</strong> The recomputed address is different than the address you entered. Please verify your address and secrets");
+    throw("wrong address");
   }
 
-    $("#publickey").val(pair.pub.encode("hex", true));
-    $("#privatekey").val(pair.priv.toString(16));
-    if ($("#crypto_solo").val() == "BTC" || $("#crypto_solo").val() == "BCH" || $("#crypto_solo").val() == "LTC")
-    {
+  $("#publickey").val(pair.pub.encode("hex", true));
+  $("#privatekey").val(pair.priv.toString(16));
+  if ($("#crypto_solo").val() == "BTC" || $("#crypto_solo").val() == "BCH" || $("#crypto_solo").val() == "LTC")
+  {
     $("#privatekeywif").val(compute_wif_privkey(pair.priv, $("#crypto_solo").val()  ));
   }
- 
-    value = 100;
-    $('#recomputeprogress').css('width', value + '%').attr('aria-valuenow', value);
+
+  value = 100;
+  $('#recomputeprogress').css('width', value + '%').attr('aria-valuenow', value);
 }
 
 function create_secret_form()
 {
-    if ($("#type_solo").val() === "SOLO"){
-        $("#secrets_form")[0].innerHTML= `
-            <div class="form-group">
-                <label for="secret1">Secret 1:</label>
-                <input type="text" class="form-control" id="secret1" onchange="remove_alerts(); cleanprivate(); " placeholder="Secret 1">
-            </div>
-            <div class="form-group">
-                <label for="secret2">Secret 2:</label>
-                <input type="text" class="form-control" id="secret2" onchange="remove_alerts(); cleanprivate();" placeholder="Secret 2">
-            </div>`;
-      }
-      else{
-        $("#secrets_form")[0].innerHTML= `
-            <div class="form-group">
-                <label for="secret_p">Number of SOLO Pro required to recompute the secrets:</label>
-                <input type="text" class="form-control" id="secret_p" onchange="remove_alerts(); cleanprivate(); reformat_pro()" value="2">
-                <label for="secret_n">out of:</label>
-                <input type="text" class="form-control" id="secret_n" onchange="remove_alerts(); cleanprivate(); reformat_pro()" value="3">
-            </div>
-            <div class="form-group" id="secrets_form_pro">
-            </div>`;
-        reformat_pro();
-      
-      }
+  if ($("#type_solo").val() === "SOLO"){
+    $("#secrets_form")[0].innerHTML= `
+        <div class="form-group">
+            <label for="secret1">Secret 1:</label>
+            <input type="text" class="form-control" id="secret1" onchange="remove_alerts(); cleanprivate(); " placeholder="Secret 1">
+        </div>
+        <div class="form-group">
+            <label for="secret2">Secret 2:</label>
+            <input type="text" class="form-control" id="secret2" onchange="remove_alerts(); cleanprivate();" placeholder="Secret 2">
+        </div>`;
+  }
+  else{
+    $("#secrets_form")[0].innerHTML= `
+        <div class="form-group">
+            <label for="secret_p">Number of SOLO Pro required to recompute the secrets:</label>
+            <input type="text" class="form-control" id="secret_p" onchange="remove_alerts(); cleanprivate(); reformat_pro()" value="2">
+            <label for="secret_n">out of:</label>
+            <input type="text" class="form-control" id="secret_n" onchange="remove_alerts(); cleanprivate(); reformat_pro()" value="3">
+        </div>
+        <div class="form-group" id="secrets_form_pro">
+        </div>`;
+    reformat_pro();
+    
+  }
 }
 function reformat_pro(){
   $("#secrets_form_pro")[0].innerHTML = "";
@@ -230,18 +238,18 @@ function reformat_pro(){
 }
 
 function myalert(id, html) {
-    var el = $(id)[0];
-    el.innerHTML = html;
-    el.style.display = 'block';
-    el.scrollIntoView(true);
+  var el = $(id)[0];
+  el.innerHTML = html;
+  el.style.display = 'block';
+  el.scrollIntoView(true);
 }
 
 function cleanprivate() {
-    $("#publickey").val("");
-    $("#privatekey").val("");
-    $("#privatekeywif").val("");
-    if ($("#crypto_solo").val() == "BTC" || $("#crypto_solo").val() == "BCH" || $("#crypto_solo").val() == "LTC")
-    {
+  $("#publickey").val("");
+  $("#privatekey").val("");
+  $("#privatekeywif").val("");
+  if ($("#crypto_solo").val() == "BTC" || $("#crypto_solo").val() == "BCH" || $("#crypto_solo").val() == "LTC")
+  {
     $("#privatekeywif_div").show();
   }
   else{
@@ -250,8 +258,8 @@ function cleanprivate() {
 }
 
 function remove_alerts() {
-    $("#errorphishing")[0].style.display = 'none';
-    $("#errorrecompute")[0].style.display = 'none';
+  $("#errorphishing")[0].style.display = 'none';
+  $("#errorrecompute")[0].style.display = 'none';
 }
 
 window.remove_alerts = remove_alerts;
@@ -263,7 +271,7 @@ window.reformat_pro = reformat_pro;
 create_secret_form();
 
 if (!window.location.href.startsWith("file:/")){
-    myalert("#errorphishing", "<strong>Warning.</strong>. To avoid phishing attacks please run this website locally.");
+  myalert("#errorphishing", "<strong>Warning.</strong>. To avoid phishing attacks please run this website locally.");
 }
 
 

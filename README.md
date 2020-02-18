@@ -1,4 +1,4 @@
-# solo-redeem-ripple
+# Solo Redeem Web
 
 ## Usage
 

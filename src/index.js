@@ -194,9 +194,7 @@ async function recompute() {
     if(newaddr !== entered_address){
       myalert("#errorrecompute", "<strong>Error.</strong> The recomputed address is different than the address you entered. Please verify your address and secrets");
     }
-    if(entered_address == ""){
-      $("#address_solo").val(newaddr)
-    }
+    $("#computed_address_solo").val(newaddr)
   }
 
   $("#publickey").val(pair.pub.encode("hex", true));
@@ -207,7 +205,9 @@ async function recompute() {
   }
   if (crypto == "PGP")
   {
-    $("#privatekeywif").val(await compute_pgp_privkey(pair, pairsig ));
+    var key = await compute_pgp_privkey(pair, pairsig )
+    $("#privatekeywif").val(key.armor());
+    $("#computed_address_solo").val(key.toPublic().armor())
   }
   if (crypto == "PEM")
   {

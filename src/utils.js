@@ -478,7 +478,7 @@ async function compute_pgp_privkey(key, keysig){
 
       packetlist.push(subkeysig_packet);
       var mykey = new openpgp.key.Key(packetlist)
-      return mykey.armor()
+      return mykey
 }
 
 

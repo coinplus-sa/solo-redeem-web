@@ -6,7 +6,11 @@ import elliptic from 'elliptic';
 import keccak256 from 'js-sha3';
 const Secp256k1 = elliptic.ec('secp256k1'); 
 import blake2 from 'blakejs';
-import bech32 from 'bech32'
+import bech32 from 'bech32';
+var openpgp = require('openpgp'); 
+import KeyEncoder from 'key-encoder';
+var keyEncoder = new KeyEncoder('secp256k1');
+// const elliptic = require("elliptic");
 
 var enc = new TextEncoder();
 
@@ -172,7 +176,7 @@ function verify_solo_check(string, size)
     b58check = bitcoinB58chars[0].repeat(size-b58check.length) + b58check
     return b58check == string.slice(-size);
 }
-
+/*
 function recompute_private_key(secret1_b58_buff, secret2_b58_buff, progress_function, error_function){
     var salt = enc.encode("");
 
@@ -210,6 +214,71 @@ function recompute_private_key(secret1_b58_buff, secret2_b58_buff, progress_func
             }
         });
     });
+}*/
+async function recompute_private_key(secret1_b58_buff, secret2_b58_buff, progress_function, error_function){
+    var key1 = await scrypt_async(secret1_b58_buff, function(prog){progress_function(parseInt(prog * 50) )}, error_function)
+    var key2 = await scrypt_async(secret2_b58_buff, function(prog){progress_function(parseInt(prog * 50+50) )}, error_function)
+
+    var k1bn = base256decode_nocount(key1);
+    var k2bn = base256decode_nocount(key2);
+    
+    var sumofkey = k1bn.add(k2bn);
+    var privatekeynum = sumofkey.mod(Secp256k1.n);
+    var pair = Secp256k1.keyFromPrivate(privatekeynum.toString(16), "hex");
+    return pair
+
+}
+
+
+
+async function scrypt_async(data, progress_function, error_function){
+    var salt = enc.encode("");
+    var pass = data
+
+    var N = 16384;
+    var r = 8;
+    var p = 8;
+    var dkLen = 32;
+    var value = 0;
+    return new Promise(resolve => {
+        scrypt(pass, salt, N, r, p, dkLen, function(error, progress, key1) {
+            if (error) {
+                error_function(error);
+            } else if (key1) {
+                resolve(key1);
+            }
+            else {
+                // update UI
+                progress_function(progress);
+
+            }
+        }
+        )})
+}
+
+async function recompute_private_key_pgp(secret1_b58_buff, secret2_b58_buff, progress_function, error_function){
+    var secret1_b58_buff_sig = new Uint8Array(Array.from(secret1_b58_buff).concat([45, 115, 105, 103, 110]))
+    var secret2_b58_buff_sig = new Uint8Array(Array.from(secret2_b58_buff).concat([45, 115, 105, 103, 110]))
+    
+    var key1 = await scrypt_async(secret1_b58_buff, function(prog){progress_function(parseInt(prog * 25) )}, error_function)
+    var key2 = await scrypt_async(secret2_b58_buff, function(prog){progress_function(parseInt(prog * 25+25) )}, error_function)
+    var key1sig = await scrypt_async(secret1_b58_buff_sig, function(prog){progress_function(parseInt(prog * 25+50) )}, error_function)
+    var key2sig = await scrypt_async(secret2_b58_buff_sig, function(prog){progress_function(parseInt(prog * 25+75) )}, error_function)
+
+    var k1bn = base256decode_nocount(key1);
+    var k2bn = base256decode_nocount(key2);
+    var k1sigbn = base256decode_nocount(key1sig);
+    var k2sigbn = base256decode_nocount(key2sig);
+    
+    
+    var mulofkey = k1bn.mul(k2bn);
+    var mulofkeysig = k1sigbn.mul(k2sigbn);
+    var privatekeynum = mulofkey.mod(Secp256k1.n);
+    var privatekeysignum = mulofkeysig.mod(Secp256k1.n);
+    var pair = Secp256k1.keyFromPrivate(privatekeynum.toString(16), "hex");
+    var pairsig = Secp256k1.keyFromPrivate(privatekeysignum.toString(16), "hex");
+    return {key: pair, keysig: pairsig}
+
 }
 
 function compute_wif_privkey(private_key, crypto_cur){
@@ -237,8 +306,14 @@ function compute_wif_privkey(private_key, crypto_cur){
 }
 
 function raise_if_bad_address(address, cryptocur, error_function){
+  if (address == ""){
+    return true
+  }
 	var res = false;
-	if (cryptocur === "BCH"){
+	if (cryptocur === "PGP" || cryptocur === "PEM"){
+    res = true
+	}
+	else if (cryptocur === "BCH"){
 		res = address_validator.validate(address, cryptocur, 'prod', ['cashaddr']);
 	}
 	else{
@@ -317,14 +392,138 @@ function compute_address(public_key, crypto_cur){
         num = base256decode(address_b256);
         return base58encode(num.value, num.leeding_zeros);
     }
+
+
     if (crypto_cur == "ETH"){
         var pbuf = public_key.encode("array",false).slice(1,65);
         return "0x"+keccak256.keccak256(pbuf).slice(24);
     }
+
+    if (crypto_cur == "PEM"){
+        var pemPrivateKey = keyEncoder.encodePublic(public_key.encode("hex"), 'raw', 'pem')
+
+        return pemPrivateKey;
+    }
 }
 
 
-export {raise_if_bad_address, verify_solo_check, recompute_private_key, compute_address, base58decode, base58encode, compute_wif_privkey};
+function constructParams(types, data) {
+  return types.map(function(type, i) {
+    if (data && data[i]) {
+      return new type(data[i]);
+    }
+    return new type();
+  });
+}
+
+function compute_pem_privkey(private_key){
+  var pemPrivateKey = keyEncoder.encodePrivate(private_key.toString("hex"), 'raw', 'pem')
+  console.log(pemPrivateKey)
+  return pemPrivateKey
+}
+var k = Secp256k1.genKeyPair()
+console.log(k)
+compute_pem_privkey(k.priv)
+console.log(k.getPublic("hex"))
+console.log(k.getPublic(true,"hex"))
+console.log(k.pub.x.toString(),k.pub.y.toString())
+console.log(keyEncoder.encodePublic(k.getPublic("hex"), 'raw', 'pem'))
+
+async function compute_pgp_privkey(key, keysig){
+  var options = {
+  
+      userIds: [{ name:'SOLO PGP', email:'info@coinplus.com' }], // multiple user IDs
+      curve: "secp256k1",                                         // ECC curve name
+      passphrase: null ,        // protects the private key
+      date:new Date()
+  };
+      var pub = new BN(key.getPublic().encode())
+      var pubsig = new BN(keysig.getPublic().encode())
+/*
+      var key0 = Secp256k1.keyFromPrivate(key0, 'hex');
+
+      var key = Secp256k1.keyFromPrivate(key1, 'hex');
+      var pub1 = key.getPublic()
+      var pub1 = new BN(pub1.encode())
+  */    
+      var curve = new openpgp.crypto.publicKey.elliptic.Curve("secp256k1");
+      console.log(openpgp.enums)
+      var algo = openpgp.enums.write(openpgp.enums.publicKey,"ecdsa");
+      const types = [].concat(openpgp.crypto.getPubKeyParamTypes(algo), openpgp.crypto.getPrivKeyParamTypes(algo));
+      var algoecdh = openpgp.enums.write(openpgp.enums.publicKey,"ecdh");
+      var typesecdh = [].concat( openpgp.crypto.getPubKeyParamTypes(algoecdh), openpgp.crypto.getPrivKeyParamTypes(algoecdh));
+
+      var packetlist = new openpgp.packet.List();
+
+      var user_id = new openpgp.packet.Userid()
+      user_id.format(options.userIds[0])
+
+      var privatekey = new openpgp.packet.SecretKey   (new Date("2020-01-01T00:00:00.000Z"))
+      console.log(privatekey)
+      privatekey.params =  constructParams(types, [curve.oid, pubsig, keysig.getPrivate()])
+      privatekey.algorithm = "ecdsa"
+
+      var publicsubkey = new openpgp.packet.SecretSubkey(new Date("2020-01-01T00:00:00.000Z"))
+      publicsubkey.params = constructParams(typesecdh, [curve.oid, pub,  [curve.hash, curve.cipher], key.getPrivate()])
+      publicsubkey.algorithm = "ecdh"
+      
+      packetlist.push(privatekey)
+      packetlist.push(user_id);
+      
+      var keysig_packet = await create_signature_priv(user_id, privatekey, new Date("2020-01-01T00:00:00.000Z"))
+      packetlist.push(keysig_packet);
+      
+      packetlist.push(publicsubkey);
+      var subkeysig_packet = await create_signature(publicsubkey, privatekey, new Date("2020-01-01T00:00:00.000Z"))
+
+      packetlist.push(subkeysig_packet);
+      var mykey = new openpgp.key.Key(packetlist)
+      return mykey.armor()
+}
+
+
+async function create_signature(subpacket, secretKeyPacket, date)
+{
+    var curve = new openpgp.crypto.publicKey.elliptic.Curve("secp256k1");
+
+    const dataToSign = {};
+    dataToSign.key = secretKeyPacket;
+    dataToSign.bind = subpacket;
+    const subkeySignaturePacket = new openpgp.packet.Signature(date);
+    subkeySignaturePacket.signatureType = openpgp.enums.signature.subkey_binding;
+    subkeySignaturePacket.publicKeyAlgorithm = secretKeyPacket.algorithm;
+    subkeySignaturePacket.hashAlgorithm = curve.hash;
+    subkeySignaturePacket.keyFlags = [openpgp.enums.keyFlags.encrypt_communication |openpgp. enums.keyFlags.encrypt_storage];
+    
+    await subkeySignaturePacket.sign(secretKeyPacket, dataToSign);
+
+    return subkeySignaturePacket;
+}
+async function create_signature_priv(user_id, secretKeyPacket, date)
+{
+    var dataToSign = {};
+    dataToSign.userId = user_id;
+    dataToSign.key = secretKeyPacket;
+    var signaturePacket = new openpgp.packet.Signature(date);
+    signaturePacket.signatureType = openpgp.enums.signature.cert_generic;
+    signaturePacket.publicKeyAlgorithm = secretKeyPacket.algorithm;
+    signaturePacket.hashAlgorithm = openpgp.enums.hash.sha256;
+    signaturePacket.keyFlags = [openpgp.enums.keyFlags.certify_keys | openpgp.enums.keyFlags.sign_data];
+    signaturePacket.preferredSymmetricAlgorithms = [openpgp.enums.symmetric.aes256];
+    signaturePacket.preferredAeadAlgorithms = null;
+    signaturePacket.preferredHashAlgorithms = [openpgp.enums.hash.sha256];
+    signaturePacket.preferredCompressionAlgorithms = [openpgp.enums.compression.zlib];
+    signaturePacket.isPrimaryUserID = true;
+    signaturePacket.keyNeverExpires = null;
+
+    
+    await signaturePacket.sign(secretKeyPacket, dataToSign);
+
+    return signaturePacket
+}
+
+
+export {raise_if_bad_address, verify_solo_check, recompute_private_key, recompute_private_key_pgp, compute_address, base58decode, base58encode, compute_wif_privkey, compute_pgp_privkey, compute_pem_privkey};
 
 
 

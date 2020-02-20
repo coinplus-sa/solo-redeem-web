@@ -36,6 +36,8 @@
                   <option value="XRP">XRP</option>
                   <option value="XTZ">XTZ</option>
                   <option value="ETH">ETH</option>
+                  <option value="PEM">PEM</option>
+                  <option value="PGP">PGP</option>
                 </select>
             </div>
             <div class="form-group">
@@ -50,8 +52,8 @@
             </div>
 
             <div class="form-group">
-                <label for="address_solo">Address (used to validate the secrets):</label>
-                <input type="text" class="form-control" id="address_solo" onchange="remove_alerts(); cleanprivate()" placeholder="Address">
+                <label for="address_solo">Address or Public key (used to validate the secrets):</label>
+                <textarea  class="form-control" id="address_solo" onchange="remove_alerts(); cleanprivate()" ></textarea>
             </div>
             <button id="recompute_button" type="button"  onclick="recompute()" class="btn btn-primary">recompute</button>
             <div class="alert alert-danger" role="alert" id="errorrecompute" style="display:none">
@@ -71,7 +73,8 @@
             </div>
             <div class="form-group" id="privatekeywif_div">
                 <label for="publickey">Private Key (wif format):</label>
-                <input disabled type="text" class="form-control" id="privatekeywif" placeholder="Public Key">
+                <textarea id="privatekeywif" rows="4" disabled type="text" class="form-control" id="privatekeywif">Public Key
+                </textarea>
             </div>
 
 

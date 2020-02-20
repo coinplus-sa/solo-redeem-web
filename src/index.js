@@ -6,7 +6,7 @@ import img from "./coinplus-icon.png";
 import imglogo from "./coinplus-logo.png";
 //const $ = require('jquery');
 import $ from "jquery";
-import {raise_if_bad_address, verify_solo_check, recompute_private_key, compute_address, compute_wif_privkey} from "./utils";
+import {raise_if_bad_address, verify_solo_check, recompute_private_key, compute_pem_privkey, recompute_private_key_pgp,  compute_address, compute_pgp_privkey, compute_wif_privkey} from "./utils";
 import {reconstruct_secrets} from "./shamir";
 
 
@@ -131,8 +131,17 @@ function get_secrets_solo_pro(){
   return reconstruct_secrets(secrets1, secrets2, cards)
 }
 
+function progress_function(progress){
+  $('#recomputeprogress').css('width', progress + '%').attr('aria-valuenow', progress);
+}
+function error_function(error){
+  myalert("#errorrecompute", "<strong>Error.</strong>" + error);
+  throw("recompute error");
+}
+
 async function recompute() {
   cleanprivate();
+  remove_alerts();
   var secrets;
   if ($("#type_solo").val() === "SOLO"){
   secrets = get_secrets_solo();
@@ -144,29 +153,33 @@ async function recompute() {
   var enc = new TextEncoder();
   var secret1_b58_buff = enc.encode(secrets.secret1_b58);
   var secret2_b58_buff = enc.encode(secrets.secret2_b58);
+  var crypto = $("#crypto_solo").val();
+
 
   var value = 0;
 
   raise_if_bad_address($("#address_solo").val(), $("#crypto_solo").val(), function(){
       myalert("#errorrecompute", "<strong>Error.</strong> This is not a valid Address");
   })
-  var pair = await recompute_private_key(secret1_b58_buff, secret2_b58_buff,
-                                         function(progress){
-                                          $('#recomputeprogress').css('width', progress + '%').attr('aria-valuenow', progress);
-                                         },
-                                         function(error){
-                                          myalert("#errorrecompute", "<strong>Error.</strong>" + error);
-                                          throw("recompute error");
-                                         });
+  if (crypto === "PGP"){
+      var { key, keysig } = await recompute_private_key_pgp(secret1_b58_buff, secret2_b58_buff,
+                                                 progress_function, error_function);
+      var pair = key;
+      var pairsig = keysig;
+  }
+  else{
+      var pair = await recompute_private_key(secret1_b58_buff, secret2_b58_buff,
+                                                progress_function, error_function);
+  }
+  console.log(pair)
   pair.getPublic(); // force to compute the public key
-  var newaddr = compute_address(pair.pub,  $("#crypto_solo").val());
   var entered_address = $("#address_solo").val();
 
-  if($("#crypto_solo").val() == "ETH")
+  if(crypto == "ETH")
   {
     entered_address = entered_address.toLowerCase();
   }
-  if($("#crypto_solo").val() == "BCH")
+  if(crypto == "BCH")
   {
     if (!entered_address.startsWith("bitcoincash:"))
     {
@@ -174,16 +187,31 @@ async function recompute() {
       $("#address_solo").val(entered_address)
     }
   }
-  if (newaddr !== entered_address){
-    myalert("#errorrecompute", "<strong>Error.</strong> The recomputed address is different than the address you entered. Please verify your address and secrets");
-    throw("wrong address");
+  if (crypto != "PGP")
+  {
+    var newaddr = compute_address(pair.pub, crypto);
+    console.log(newaddr, entered_address)
+    if(newaddr !== entered_address){
+      myalert("#errorrecompute", "<strong>Error.</strong> The recomputed address is different than the address you entered. Please verify your address and secrets");
+    }
+    if(entered_address == ""){
+      $("#address_solo").val(newaddr)
+    }
   }
 
   $("#publickey").val(pair.pub.encode("hex", true));
   $("#privatekey").val(pair.priv.toString(16));
-  if ($("#crypto_solo").val() == "BTC" || $("#crypto_solo").val() == "BCH" || $("#crypto_solo").val() == "LTC")
+  if (crypto == "BTC" || crypto == "BCH" || crypto == "LTC")
   {
-    $("#privatekeywif").val(compute_wif_privkey(pair.priv, $("#crypto_solo").val()  ));
+    $("#privatekeywif").val(compute_wif_privkey(pair.priv, crypto  ));
+  }
+  if (crypto == "PGP")
+  {
+    $("#privatekeywif").val(await compute_pgp_privkey(pair, pairsig ));
+  }
+  if (crypto == "PEM")
+  {
+    $("#privatekeywif").val(await compute_pem_privkey(pair.priv ));
   }
 
   value = 100;
@@ -248,7 +276,7 @@ function cleanprivate() {
   $("#publickey").val("");
   $("#privatekey").val("");
   $("#privatekeywif").val("");
-  if ($("#crypto_solo").val() == "BTC" || $("#crypto_solo").val() == "BCH" || $("#crypto_solo").val() == "LTC")
+  if ($("#crypto_solo").val() == "BTC" || $("#crypto_solo").val() == "BCH" || $("#crypto_solo").val() == "LTC"|| $("#crypto_solo").val() == "PGP"|| $("#crypto_solo").val() == "PEM")
   {
     $("#privatekeywif_div").show();
   }
